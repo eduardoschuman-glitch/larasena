@@ -54,61 +54,40 @@ root.querySelectorAll('#fb-faq .fb-faq-btn').forEach((btn) => {
   });
 });
 
-// video players
-const isMobile = window.matchMedia('(max-width:820px)').matches;
+// video players (both identical: manual play, sound, gold progress bar, pause off-screen, resume, no fullscreen)
 root.querySelectorAll('.fb-video').forEach((box) => {
   const video = box.querySelector('video');
   const playBtn = box.querySelector('.fb-video-play');
-  const closeBtn = box.querySelector('.fb-video-close');
   const fill = box.querySelector('.fb-video-progress i');
-  const isVsl = box.classList.contains('fb-video-vsl');
-  let autoOnce = false;
+  let started = false;
 
   video.addEventListener('timeupdate', () => {
     if (fill && video.duration) fill.style.width = (video.currentTime / video.duration * 100) + '%';
   });
 
-  const restore = () => {
-    box.classList.remove('fb-fs', 'playing');
+  playBtn.addEventListener('click', () => {
+    started = true;
+    box.classList.add('playing');
     video.controls = false;
-    try { video.pause(); } catch (e) {}
+    video.muted = false;
+    video.play().catch(() => {});
+  });
+
+  video.addEventListener('ended', () => {
+    started = false;
+    box.classList.remove('playing');
     try { video.currentTime = 0; } catch (e) {}
     if (fill) fill.style.width = '0%';
     video.load();
-  };
-  video.addEventListener('ended', restore);
-  if (closeBtn) closeBtn.addEventListener('click', restore);
+  });
 
-  if (isVsl) {
-    // VSL: autoplay-on-scroll with sound (once), no pause until ended, custom gold bar
-    video.addEventListener('pause', () => {
-      if (!video.ended && box.classList.contains('playing')) video.play().catch(() => {});
+  const vio = new IntersectionObserver((ents) => {
+    ents.forEach((e) => {
+      if (!started) return;
+      if (e.intersectionRatio < 0.4) { try { video.pause(); } catch (x) {} }
+      else if (e.isIntersecting) { video.play().catch(() => {}); }
     });
-    const start = () => {
-      box.classList.add('playing');
-      if (isMobile) box.classList.add('fb-fs');
-      video.controls = false;
-      video.muted = false;
-      return video.play();
-    };
-    playBtn.addEventListener('click', () => { start().catch(() => {}); });
-    const vio = new IntersectionObserver((ents) => {
-      ents.forEach((e) => {
-        if (e.isIntersecting && !autoOnce) {
-          autoOnce = true;
-          start().catch(() => { box.classList.remove('playing', 'fb-fs'); });
-        }
-      });
-    }, { threshold: 0.5 });
-    vio.observe(box);
-  } else {
-    // testimonial: manual only, native controls, sound, no fullscreen
-    playBtn.addEventListener('click', () => {
-      box.classList.add('playing');
-      video.controls = true;
-      video.muted = false;
-      video.play().catch(() => {});
-    });
-  }
+  }, { threshold: [0, 0.4, 0.75] });
+  vio.observe(box);
 });
 });
